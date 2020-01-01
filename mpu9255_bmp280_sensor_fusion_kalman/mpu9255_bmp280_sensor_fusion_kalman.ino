@@ -90,17 +90,7 @@ void loop() {
   float estimated_altitude = pressureKalmanFilter.updateEstimate(altitude);
   vario = (estimated_altitude-previous_estimated_altitude)/deltat;
   previous_estimated_altitude = estimated_altitude;
-/*
-if (millis() > vario_refresh_time) {
-  //trzeba by zrobic zeby liczyl sobie roznice do poprzedniej probki w razie przeciazenia proca
-  //moze uzyc deltat???
-      vario = (estimated_altitude-previous_estimated_altitude)*1000/VARIO_REFRESH_TIME;
-      
-      previous_estimated_altitude = estimated_altitude;
-      vario_refresh_time=millis()+VARIO_REFRESH_TIME;
-     
-    }
-*/
+
   if (millis() > refresh_time) {
     Serial.print(altitude,6);
     Serial.print("\t");
