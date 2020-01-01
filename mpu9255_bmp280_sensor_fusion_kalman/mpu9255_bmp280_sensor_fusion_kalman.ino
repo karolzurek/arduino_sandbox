@@ -27,11 +27,13 @@ SF fusion;
 MPU9250 IMU(Wire,0x68); // an MPU9250 object with the MPU-9250 sensor on I2C bus 0 with address 0x68
 Adafruit_BMP280 bmp; // I2C
 SimpleKalmanFilter pressureKalmanFilter(0.15, 1, 0.01); //0.1 to 0.2 are acceptable
+float toneFreq, toneFreqLowpass, pressure, lowpassFast, lowpassSlow ;
 
+int ddsAcc;
 
 void setup() {
 
-  pinMode(A5, OUTPUT);
+  //pinMode(8, OUTPUT);
   Serial.begin(115200); // serial to display data
   while(!Serial) {}
 
@@ -48,7 +50,7 @@ void setup() {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring!"));
     while (1);
   }
-
+  lowpassFast = lowpassSlow = pressure;
 }
 
 void loop() {
@@ -73,25 +75,40 @@ void loop() {
   pitch = fusion.getPitch();
   roll = fusion.getRoll();    //you could also use getRollRadians() ecc
   yaw = fusion.getYaw();
-/*
-  Serial.print("Pitch:\t"); Serial.println(pitch);
-  Serial.print("Roll:\t"); Serial.println(roll);
-  Serial.print("Yaw:\t"); Serial.println(yaw);
-  Serial.println();
-  */
+
   altitude = bmp.readAltitude(1030.25);
   estimated_altitude = pressureKalmanFilter.updateEstimate(altitude);
   vario = (estimated_altitude-previous_estimated_altitude)/deltat;
   previous_estimated_altitude = estimated_altitude;
 
+  pressure = -estimated_altitude*10;
+  lowpassFast = lowpassFast + (pressure - lowpassFast) * 0.1;
+  lowpassSlow = lowpassSlow + (pressure - lowpassSlow) * 0.05;
+  toneFreq = (lowpassSlow - lowpassFast) * 50;
+  toneFreqLowpass = toneFreqLowpass + (toneFreq - toneFreqLowpass) * 0.1;
+  toneFreq = constrain(toneFreqLowpass, -500, 500);
+  ddsAcc += toneFreq * 100 + 2000;
+  
+  if (toneFreq < 0 || ddsAcc > 0) 
+  {
+    tone(8, toneFreq + 510);  
+  }
+  else
+  {
+    noTone(8);
+  }
+  
   if (millis() > refresh_time) {
+    /**/
+    Serial.print("Pitch:\t"); Serial.print(pitch);Serial.print("\t");
+    Serial.print("Roll:\t"); Serial.print(roll);Serial.print("\t");
+    Serial.print("Yaw:\t"); Serial.print(yaw);Serial.print("\t");
+    /**/
     Serial.print(altitude,6);
     Serial.print("\t");
     Serial.print(estimated_altitude,6);
     Serial.print("\t");
     Serial.print(vario,3);
-    Serial.print("\t");
-    Serial.print(deltat,6);
     Serial.println();    
     refresh_time=millis()+SERIAL_REFRESH_TIME;
 
