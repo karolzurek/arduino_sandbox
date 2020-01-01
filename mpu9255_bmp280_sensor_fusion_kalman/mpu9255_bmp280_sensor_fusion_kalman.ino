@@ -8,38 +8,32 @@ mpu9250 + bmp280 + sensor fusion + kalman
 #include "SensorFusion.h" //SF
 #include <SimpleKalmanFilter.h>
 
-SF fusion;
-
-float gx, gy, gz, ax, ay, az, mx, my, mz;
-float pitch, roll, yaw;
-float deltat;
-
-// an MPU9250 object with the MPU-9250 sensor on I2C bus 0 with address 0x68
-MPU9250 IMU(Wire,0x68);
-int status;
-
 #define BMP_SCK  (13)
 #define BMP_MISO (12)
 #define BMP_MOSI (11)
 #define BMP_CS   (10)
 
-Adafruit_BMP280 bmp; // I2C
 
+float gx, gy, gz, ax, ay, az, mx, my, mz;
+float pitch, roll, yaw;
+float deltat;
+int status;
 const long SERIAL_REFRESH_TIME = 1000;
-const long VARIO_REFRESH_TIME = 200;
 long refresh_time;
-long vario_refresh_time;
 float previous_estimated_altitude;
-float toneFreq;
 float vario;
+float altitude, estimated_altitude;
 
+SF fusion;
+MPU9250 IMU(Wire,0x68); // an MPU9250 object with the MPU-9250 sensor on I2C bus 0 with address 0x68
+Adafruit_BMP280 bmp; // I2C
 SimpleKalmanFilter pressureKalmanFilter(0.15, 1, 0.01); //0.1 to 0.2 are acceptable
+
 
 void setup() {
 
   pinMode(A5, OUTPUT);
-  // serial to display data
-  Serial.begin(115200);
+  Serial.begin(115200); // serial to display data
   while(!Serial) {}
 
   // start communication with IMU 
@@ -86,8 +80,8 @@ void loop() {
   Serial.print("Yaw:\t"); Serial.println(yaw);
   Serial.println();
   */
-  float altitude = bmp.readAltitude(1030.25);
-  float estimated_altitude = pressureKalmanFilter.updateEstimate(altitude);
+  altitude = bmp.readAltitude(1030.25);
+  estimated_altitude = pressureKalmanFilter.updateEstimate(altitude);
   vario = (estimated_altitude-previous_estimated_altitude)/deltat;
   previous_estimated_altitude = estimated_altitude;
 
