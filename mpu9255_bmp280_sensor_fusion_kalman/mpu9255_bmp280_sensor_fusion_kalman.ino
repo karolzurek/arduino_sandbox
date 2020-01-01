@@ -4,21 +4,20 @@ mpu9250 + bmp280 + sensor fusion + kalman
 
 #include <Wire.h>
 #include <Adafruit_BMP280.h>
-#include "MPU9250.h"
-#include "SensorFusion.h" //SF
+#include <MPU9250.h>
+#include <SensorFusion.h> //SF
 #include <SimpleKalmanFilter.h>
 
-#define BMP_SCK  (13)
-#define BMP_MISO (12)
-#define BMP_MOSI (11)
-#define BMP_CS   (10)
-
+const int BMP_SCK = 13;
+const int BMP_MISO = 12;
+const int BMP_MOSI = 11;
+const int BMP_CS = 10;
+const long SERIAL_REFRESH_TIME = 1000;
 
 float gx, gy, gz, ax, ay, az, mx, my, mz;
 float pitch, roll, yaw;
 float deltat;
 int status;
-const long SERIAL_REFRESH_TIME = 1000;
 long refresh_time;
 float previous_estimated_altitude;
 float vario;
