@@ -1,9 +1,9 @@
-#include "dht.h"
+#include "dhtnew.h"
 #include "U8g2lib.h"
 #include "SPI.h"
 #include "Wire.h"
 
-dht DHT22;
+DHTNEW dht22(7);
 #define DHT22PIN 7
 U8X8_SSD1306_128X32_UNIVISION_SW_I2C u8x8(3, 4);
 
@@ -29,24 +29,24 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   
-  int chk = DHT22.read(DHT22PIN);         //sprawdzenie stanu sensora
+  int chk = dht22.read();         //sprawdzenie stanu sensora
  
   switch (chk)
   {
     case DHTLIB_OK: 
       Serial.print("Wilgotnosc (%): ");              //wyświetlenie wartości wilgotności
-      Serial.print((float)DHT22.humidity, 2);
+      Serial.print((float)dht22.getHumidity(), 2);
       Serial.print(" ");
       Serial.print("Temperatura (C): ");           //wyświetlenie temperatury
-      Serial.println((float)DHT22.temperature, 2);
+      Serial.println((float)dht22.getTemperature(), 2);
       u8x8.setCursor(1, 2);
-      u8x8.print((float)DHT22.humidity, 2);
+      u8x8.print((float)dht22.getHumidity(), 2);
       u8x8.setCursor(9, 2);
-      u8x8.print((float)DHT22.temperature, 2);
-      if (DHT22.humidity > 72) {
+      u8x8.print((float)dht22.getTemperature(), 2);
+      if (dht22.getHumidity() > 72) {
         digitalWrite(10, HIGH);
         //digitalWrite(13, HIGH);
-      } else if (DHT22.humidity < 67) {
+      } else if (dht22.getHumidity() < 67) {
         digitalWrite(10, LOW);
         //digitalWrite(13, LOW);
       } else {
@@ -61,13 +61,11 @@ void loop() {
       }
     break;
     case DHTLIB_ERROR_CHECKSUM: 
-    //Serial.println("Błąd sumy kontrolnej"); 
-    break;
-    case DHTLIB_ERROR_TIMEOUT: 
-    //Serial.println("Koniec czasu oczekiwania - brak odpowiedzi"); 
+    Serial.println("Błąd sumy kontrolnej"); 
     break;
     default: 
-    //Serial.println("Nieznany błąd"); 
+    Serial.println("Nieznany błąd"); 
+    Serial.println((char)chk);
     break;
   }
   
