@@ -1,10 +1,13 @@
-#include "dhtnew.h"
+#include <DHT.h>
+
 #include "U8g2lib.h"
 #include "SPI.h"
 #include "Wire.h"
 
-DHTNEW dht22(7);
-#define DHT22PIN 7
+#define DHTPIN 7
+#define DHTTYPE DHT22
+
+DHT dht(DHTPIN, DHTTYPE);
 U8X8_SSD1306_128X32_UNIVISION_SW_I2C u8x8(3, 4);
 
 void setup() {
@@ -19,6 +22,8 @@ void setup() {
   //pinMode(13, OUTPUT);
   //digitalWrite(13, LOW);
 
+  dht.begin(); //dht
+
   Serial.begin(115200);                    //inicjalizacja monitora szeregowego
   u8x8.begin();
   u8x8.setFont(u8x8_font_amstrad_cpc_extended_f);
@@ -28,25 +33,25 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  float temp_hum_val[2] = {0};
+
+  if (!dht.readTempAndHumidity(temp_hum_val)) {
+    float h = 17.00 + temp_hum_val[0]; //offfset zeby zsynchronizowac z innym
+    float t = temp_hum_val[1];
   
-  int chk = dht22.read();         //sprawdzenie stanu sensora
- 
-  switch (chk)
-  {
-    case DHTLIB_OK: 
       Serial.print("Wilgotnosc (%): ");              //wyświetlenie wartości wilgotności
-      Serial.print((float)dht22.getHumidity(), 2);
+      Serial.print((float)h, 2);
       Serial.print(" ");
       Serial.print("Temperatura (C): ");           //wyświetlenie temperatury
-      Serial.println((float)dht22.getTemperature(), 2);
+      Serial.println((float)t, 2);
       u8x8.setCursor(1, 2);
-      u8x8.print((float)dht22.getHumidity(), 2);
+      u8x8.print((float)h, 2);
       u8x8.setCursor(9, 2);
-      u8x8.print((float)dht22.getTemperature(), 2);
-      if (dht22.getHumidity() > 72) {
+      u8x8.print((float)t, 2);
+      if (h > 72) {
         digitalWrite(10, HIGH);
         //digitalWrite(13, HIGH);
-      } else if (dht22.getHumidity() < 67) {
+      } else if (h < 67) {
         digitalWrite(10, LOW);
         //digitalWrite(13, LOW);
       } else {
@@ -59,16 +64,9 @@ void loop() {
         digitalWrite(13, HIGH);
         */
       }
-    break;
-    case DHTLIB_ERROR_CHECKSUM: 
-    Serial.println("Błąd sumy kontrolnej"); 
-    break;
-    default: 
-    Serial.println("Nieznany błąd"); 
-    Serial.println((char)chk);
-    break;
+   
   }
   
-  delay(1000);
+  delay(2000);
 
 }
