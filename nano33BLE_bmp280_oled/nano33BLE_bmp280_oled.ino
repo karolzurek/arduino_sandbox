@@ -1,62 +1,106 @@
 /*
-nano 33 ble + bmp280 + sensor fusion + kalman + oled + glosnik + przycisk??
+nano 33 ble + bmp180 + sensor fusion + kalman + oled + glosnik? + przycisk??
 audio vario
 kompensacja
 ahrs
 asystent krazenia
 auto widok asystenta
 */
-
+#include <Arduino.h>
 #include <Wire.h>
-#include <Arduino_LSM9DS1.h>
+#include <Arduino_LSM9DS1.h> //IMU
 #include <SensorFusion.h> //SF
 #include <SimpleKalmanFilter.h>
-#include "U8g2lib.h"
-#include <Adafruit_BMP085.h>
+#include "U8g2lib.h" //display
+#include <Adafruit_BMP085.h> //bmp180
 
 
-const long SERIAL_REFRESH_TIME = 1000;
+/*
+#include "wiring_private.h" //gps?
+#include "HardwareSerial.h" //gps? 
+#include <TinyGPS.h> //gps
+*/
+
+// #define I2C_ADDRESS 0x77
+
+const long SERIAL_REFRESH_TIME = 1000; //gps
+const long SERIAL_REFRESH_TIME_20 = 20; //gps
 
 float gx, gy, gz, ax, ay, az, mx, my, mz;
 float pitch, roll, yaw;
 float deltat;
-unsigned long refresh_time;
+unsigned long refresh_time, refresh_time_20; //gps
 float previous_estimated_altitude;
 float vario, vario_g;
 float altitude, estimated_altitude;
 
-SF fusion;
-U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, 5, 4);
-SimpleKalmanFilter pressureKalmanFilter(0.15, 1, 0.01); //0.1 to 0.2 are acceptable
-float toneFreq, toneFreqLowpass, pressure, lowpassFast, lowpassSlow;
+//long lat, lon;
+//unsigned long fix_age, time_z , date_z;
+
+
+//UART mySerial (digitalPinToPinName(6), digitalPinToPinName(5), NC, NC); //gpsimu
+U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, 5, 4); //wyswietlacz
+
+//TinyGPS gps; //gps
+//BMP280 bmp; //cisnienie
+
 Adafruit_BMP085 bmp;
+
+// BMP180I2C bmp(I2C_ADDRESS);
+
+SF fusion; //sensor fusion
+SimpleKalmanFilter pressureKalmanFilter(0.15, 1, 0.01); //0.1 to 0.2 are acceptable Kalman na wysokość
+
+float toneFreq, toneFreqLowpass, pressure, lowpassFast, lowpassSlow;
 
 int ddsAcc;
 
+long satek; //gps
+int year;//gps
+byte month, day, hour, minute, second, hundredths; //gps
+
+
 void setup() {
 
-  //Serial.begin(115200); // serial to display data
-  //while(!Serial) {}
+  Serial.begin(115200);
 
-  pinMode(8, OUTPUT); //glosnik
-  tone(8, 1510);
+pinMode(D4, OUTPUT);
+pinMode(D5, OUTPUT);
+
+  //zasilanie pressure
+  pinMode(8, OUTPUT);
+  digitalWrite(8, HIGH);
+
+  //glosnik
+  pinMode(9, OUTPUT); 
+  tone(9, 1510, 10);
   delay(100);
-  noTone(8); 
-  
+  noTone(9); 
+
   // start communication with IMU 
   if (!IMU.begin()) {
-    //Serial.println("IMU initialization unsuccessful");
+    Serial.println("IMU initialization unsuccessful");
     while(1);
   }
+
+  //bmp180
   if (!bmp.begin()) {
-    while (1) {}
+    Serial.println("BMP initialization unsuccessful");
+    while (1);
   }
+
+  //OLED
   u8g2.begin();
 
+ /* mySerial.begin(9600); // serial to display data //gps
+  while(!mySerial) {}
+ */
+  
   lowpassFast = lowpassSlow = pressure;
 }
 
 void loop() {
+  
   // read the sensor
   if (IMU.accelerationAvailable()) {
     IMU.readAcceleration(ax, ay, az);
@@ -80,30 +124,36 @@ void loop() {
   roll = fusion.getRoll();    //you could also use getRollRadians() ecc
   yaw = fusion.getYaw();
 
-  altitude = bmp.readAltitude(103025);
+  altitude = bmp.readAltitude(101325);
   estimated_altitude = pressureKalmanFilter.updateEstimate(altitude);
+  //estimated_altitude = 600;
   vario = (estimated_altitude-previous_estimated_altitude)/deltat;
   previous_estimated_altitude = estimated_altitude;
 
-  pressure = -estimated_altitude*10;
-  lowpassFast = lowpassFast + (pressure - lowpassFast) * 0.1;
-  lowpassSlow = lowpassSlow + (pressure - lowpassSlow) * 0.05;
-  toneFreq = (lowpassSlow - lowpassFast) * 50;
-  toneFreqLowpass = toneFreqLowpass + (toneFreq - toneFreqLowpass) * 0.1;
-  toneFreq = constrain(toneFreqLowpass, -500, 500);
-  ddsAcc += toneFreq * 100 + 2000;
+// petla co 20 ms
+  if (millis() > refresh_time_20) {
+    refresh_time_20=millis()+SERIAL_REFRESH_TIME_20;
+    pressure = -estimated_altitude*10;
+    lowpassFast = lowpassFast + (pressure - lowpassFast) * 0.1;
+    lowpassSlow = lowpassSlow + (pressure - lowpassSlow) * 0.05;
+    toneFreq = (lowpassSlow - lowpassFast) * 50;
+    toneFreqLowpass = toneFreqLowpass + (toneFreq - toneFreqLowpass) * 0.1;
+    toneFreq = constrain(toneFreqLowpass, -500, 500);
+    ddsAcc += toneFreq * 100 + 2000;
   
-  if (toneFreq < 0 || ddsAcc > 0) 
-  {
-    tone(8, toneFreq + 510);  
+    if (toneFreq < 0 || ddsAcc > 0) 
+    {
+      tone(9, toneFreq + 510);  
+    }
+    else
+    {
+      noTone(9);
+    }
   }
-  else
-  {
-    noTone(8);
-  }
-  
+  // petla co 20 ms  
 
- 
+  Serial.println((float)estimated_altitude, 2);
+
   u8g2.firstPage();
 
   do {
@@ -140,36 +190,21 @@ void loop() {
     u8g2.setCursor(54, 32);
     u8g2.print((float)vario_g, 1);
 
-//wysokosc
+    //wysokosc
     u8g2.setFont(u8g2_font_p01type_tr);
     u8g2.drawStr(0, 52,"est: ");
     u8g2.setCursor(20, 52);
-    u8g2.print((float)toneFreq, 1);
+    u8g2.print((float)estimated_altitude, 1);
     u8g2.drawStr(60, 52,"wys: ");
     u8g2.setCursor(80, 52);
-    u8g2.print((float)ddsAcc, 1);
+    u8g2.print((float)altitude, 1);
+
 
     //horyzont
     //u8g2.drawEllipse(64, 32, 8, 6, U8G2_DRAW_ALL);//samolocik 
     //u8g2.drawLine(0, ((pitch-90)/-2.8)+(((roll+45)/1.35)-33), 128, ((pitch-90)/-2.8)-((roll+45)/1.35)+33);        
   } while ( u8g2.nextPage() );
   
-  if (millis() > refresh_time) {
-    /*
-    Serial.print("Pitch:\t"); Serial.print(pitch);Serial.print("\t");
-    Serial.print("Roll:\t"); Serial.print(roll);Serial.print("\t");
-    Serial.print("Yaw:\t"); Serial.print(yaw);Serial.print("\t");
-    
-    Serial.print(altitude,6);
-    Serial.print("\t");
-    Serial.print(estimated_altitude,6);
-    Serial.print("\t");
-    Serial.print(vario,3);
-    Serial.println();    
-    */
-    refresh_time=millis()+SERIAL_REFRESH_TIME;
-
-  }
-
-  delay(1);
+  
+  delay(10);
 }
