@@ -21,7 +21,6 @@ auto widok asystenta
 #include <TinyGPS.h> //gps
 */
 
-// #define I2C_ADDRESS 0x77
 
 const long SERIAL_REFRESH_TIME = 1000; //gps
 const long SERIAL_REFRESH_TIME_20 = 20; //gps
@@ -32,7 +31,7 @@ float deltat;
 unsigned long refresh_time, refresh_time_20; //gps
 float previous_estimated_altitude;
 float vario, vario_g;
-float altitude, estimated_altitude;
+float altitude, estimated_altitude, base_pressure;
 
 //long lat, lon;
 //unsigned long fix_age, time_z , date_z;
@@ -42,14 +41,12 @@ float altitude, estimated_altitude;
 U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, 5, 4); //wyswietlacz
 
 //TinyGPS gps; //gps
-//BMP280 bmp; //cisnienie
 
-Adafruit_BMP085 bmp;
+Adafruit_BMP085 bmp; //bmp180
 
-// BMP180I2C bmp(I2C_ADDRESS);
 
 SF fusion; //sensor fusion
-SimpleKalmanFilter pressureKalmanFilter(0.15, 1, 0.01); //0.1 to 0.2 are acceptable Kalman na wysokość
+SimpleKalmanFilter pressureKalmanFilter(0.7, 1, 0.1); //measurement uncertainty, estimation uncertainty, process variance
 
 float toneFreq, toneFreqLowpass, pressure, lowpassFast, lowpassSlow;
 
@@ -63,9 +60,6 @@ byte month, day, hour, minute, second, hundredths; //gps
 void setup() {
 
   Serial.begin(115200);
-
-pinMode(D4, OUTPUT);
-pinMode(D5, OUTPUT);
 
   //zasilanie pressure
   pinMode(8, OUTPUT);
@@ -83,25 +77,25 @@ pinMode(D5, OUTPUT);
     while(1);
   }
 
-  //bmp180
+  //bmp180 init
   if (!bmp.begin()) {
     Serial.println("BMP initialization unsuccessful");
     while (1);
   }
 
-  //OLED
+  //OLED init
   u8g2.begin();
 
  /* mySerial.begin(9600); // serial to display data //gps
   while(!mySerial) {}
  */
-  
+  base_pressure = bmp.readPressure();
   lowpassFast = lowpassSlow = pressure;
 }
 
 void loop() {
   
-  // read the sensor
+  // read the IMU sensor
   if (IMU.accelerationAvailable()) {
     IMU.readAcceleration(ax, ay, az);
   }
@@ -121,12 +115,13 @@ void loop() {
   fusion.MadgwickUpdate(gx, gy, gz, ax, ay, az, mx, my, mz, deltat);  //else use the magwick, it is slower but more accurate
 
   pitch = fusion.getPitch();
-  roll = fusion.getRoll();    //you could also use getRollRadians() ecc
+  roll = fusion.getRoll();
   yaw = fusion.getYaw();
 
-  altitude = bmp.readAltitude(101325);
+
+  altitude = bmp.readAltitude(base_pressure);
   estimated_altitude = pressureKalmanFilter.updateEstimate(altitude);
-  //estimated_altitude = 600;
+
   vario = (estimated_altitude-previous_estimated_altitude)/deltat;
   previous_estimated_altitude = estimated_altitude;
 
@@ -152,7 +147,6 @@ void loop() {
   }
   // petla co 20 ms  
 
-  Serial.println((float)estimated_altitude, 2);
 
   u8g2.firstPage();
 
@@ -176,27 +170,36 @@ void loop() {
     u8g2.drawStr(90, 12,"z: ");
     u8g2.setCursor(100, 12);
     u8g2.print((float)az, 1);
+    u8g2.drawStr(0, 20,"x: ");
+    u8g2.setCursor(10, 20);
+    u8g2.print((float)mx, 1);
+    u8g2.drawStr(45, 20,"y: ");
+    u8g2.setCursor(55, 20);
+    u8g2.print((float)my, 1);
+    u8g2.drawStr(90, 20,"z: ");
+    u8g2.setCursor(100, 20);
+    u8g2.print((float)mz, 1);
 
+    //VARIO
     u8g2.setFont(u8g2_font_helvB12_tr);
-    u8g2.setCursor(24, 32);
+    u8g2.setCursor(24, 40);
     vario_g = (az*10)-9.7;
     if (vario_g < 0) {
-      u8g2.drawStr(24, 32,"/\\");
+      u8g2.drawStr(24, 40,"/\\");
     } else {
-      u8g2.drawStr(24, 32,"\\/");
+      u8g2.drawStr(24, 40,"\\/");
     }
-    
-    
-    u8g2.setCursor(54, 32);
-    u8g2.print((float)vario_g, 1);
+        
+    u8g2.setCursor(54, 40);
+    u8g2.print((float)vario, 1);
 
     //wysokosc
     u8g2.setFont(u8g2_font_p01type_tr);
-    u8g2.drawStr(0, 52,"est: ");
-    u8g2.setCursor(20, 52);
+    u8g2.drawStr(0, 60,"est: ");
+    u8g2.setCursor(20, 60);
     u8g2.print((float)estimated_altitude, 1);
-    u8g2.drawStr(60, 52,"wys: ");
-    u8g2.setCursor(80, 52);
+    u8g2.drawStr(60, 60,"wys: ");
+    u8g2.setCursor(80, 60);
     u8g2.print((float)altitude, 1);
 
 
@@ -206,5 +209,5 @@ void loop() {
   } while ( u8g2.nextPage() );
   
   
-  delay(10);
+  delay(1);
 }
