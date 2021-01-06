@@ -5,7 +5,9 @@ kompensacja
 ahrs
 asystent krazenia
 auto widok asystenta
+averager noszenia 20s
 */
+
 #include <Arduino.h>
 #include <Wire.h>
 #include <Arduino_LSM9DS1.h> //IMU
@@ -92,6 +94,9 @@ void setup() {
   base_pressure = bmp.readPressure();
   lowpassFast = lowpassSlow = pressure;
 }
+
+
+
 
 void loop() {
   
@@ -181,17 +186,12 @@ void loop() {
     u8g2.print((float)mz, 1);
 
     //VARIO
-    u8g2.setFont(u8g2_font_helvB12_tr);
-    u8g2.setCursor(24, 40);
-    vario_g = (az*10)-9.7;
-    if (vario_g < 0) {
-      u8g2.drawStr(24, 40,"/\\");
-    } else {
-      u8g2.drawStr(24, 40,"\\/");
-    }
-        
-    u8g2.setCursor(54, 40);
-    u8g2.print((float)vario, 1);
+    vario_wsk(vario);
+    //vario pasek
+    pasek_vario(vario);
+    //horyzont
+    horyzont(pitch, roll);    
+    
 
     //wysokosc
     u8g2.setFont(u8g2_font_p01type_tr);
@@ -203,11 +203,53 @@ void loop() {
     u8g2.print((float)altitude, 1);
 
 
-    //horyzont
-    //u8g2.drawEllipse(64, 32, 8, 6, U8G2_DRAW_ALL);//samolocik 
-    //u8g2.drawLine(0, ((pitch-90)/-2.8)+(((roll+45)/1.35)-33), 128, ((pitch-90)/-2.8)-((roll+45)/1.35)+33);        
+
   } while ( u8g2.nextPage() );
   
   
   delay(1);
+}
+
+//pasek a'la wskazowka
+void pasek_vario (float vario) {
+      int szer=8;
+      int poz0_x=120;
+      int poz0_y=32;
+      int vario_p = constrain(vario, -5, 5);
+      //u8g2.drawBox(poz0_x, poz0_y, szer, -6.4*(vario_p));
+      for (int i=0; i<szer; i++) {
+        u8g2.drawLine(poz0_x+i, poz0_y, poz0_x+i, -6.2*(vario_p)+32);//
+      }
+      u8g2.drawLine(poz0_x-3, poz0_y, poz0_x+szer+3, poz0_y);//zero poz
+}
+
+//numeryczne info plus strzalki gora dol
+void vario_wsk (float vario) {
+    int poz0_x = 24;
+    int poz0_y = 40;
+    
+    u8g2.setFont(u8g2_font_helvB12_tr);
+    u8g2.setCursor(poz0_x, poz0_y);
+    if (vario > 0) {
+      u8g2.drawStr(poz0_x, poz0_y,"/\\");
+    } else {
+      u8g2.drawStr(poz0_x, poz0_y,"\\/");
+    }
+        
+    if (vario < 0) { //zeby nie lataly wskazania na prawo i lewo
+      u8g2.drawStr(poz0_y+18, poz0_y-2,"-");
+    } else {
+      u8g2.drawStr(poz0_y+16, poz0_y-2,"+");
+    }
+    u8g2.setCursor(poz0_y+30, poz0_y);
+    u8g2.print(abs((float)vario), 1);
+
+}
+
+void horyzont(float pitch, float roll) {
+    int poz0_x = 24;
+    int poz0_y = 40;
+    
+    //u8g2.drawEllipse(64, 32, 8, 6, U8G2_DRAW_ALL);//samolocik 
+    u8g2.drawLine(0, ((pitch-90)/-2.8)+(((roll+45)/1.35)-33), 128, ((pitch-90)/-2.8)-((roll+45)/1.35)+33);        
 }
