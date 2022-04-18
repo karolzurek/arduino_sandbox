@@ -14,7 +14,7 @@ averager noszenia 20s
 #include <SensorFusion.h> //SF
 #include <SimpleKalmanFilter.h>
 #include "U8g2lib.h" //display
-#include <Adafruit_BMP085.h> //bmp180
+#include <MS5611.h> //MS5611
 
 
 /*
@@ -44,7 +44,7 @@ U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, 5, 4); //wyswie
 
 //TinyGPS gps; //gps
 
-Adafruit_BMP085 bmp; //bmp180
+MS5611 MS5611(0x77); //ms5611
 
 
 SF fusion; //sensor fusion
@@ -79,19 +79,18 @@ void setup() {
     while(1);
   }
 
-  //bmp180 init
-  if (!bmp.begin()) {
-    Serial.println("BMP initialization unsuccessful");
-    while (1);
-  }
+  //MS5611 init
+  MS5611.init();
 
   //OLED init
   u8g2.begin();
 
  /* mySerial.begin(9600); // serial to display data //gps
   while(!mySerial) {}
- */
-  base_pressure = bmp.readPressure();
+ */ 
+   
+  MS5611.read();
+  base_pressure = MS5611.getPressure()* 0.01;
   lowpassFast = lowpassSlow = pressure;
 }
 
@@ -123,8 +122,10 @@ void loop() {
   roll = fusion.getRoll();
   yaw = fusion.getYaw();
 
-
-  altitude = bmp.readAltitude(base_pressure);
+  MS5611.read();
+  pressure = MS5611.getPressure()* 0.01;
+  altitude = 44330 * (1.0 - pow(pressure / base_pressure, 0.1903));
+  
   estimated_altitude = pressureKalmanFilter.updateEstimate(altitude);
 
   vario = (estimated_altitude-previous_estimated_altitude)/deltat;

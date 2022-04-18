@@ -1,10 +1,13 @@
-#include "dht.h"
+#include "DHT.h"
 #include "U8g2lib.h"
 #include "SPI.h"
 #include "Wire.h"
 
-dht DHT22;
-#define DHT22PIN 7
+
+#define DHTPIN 7
+#define DHTTYPE DHT22
+
+DHT dht(DHTPIN, DHTTYPE);
 U8X8_SSD1306_128X32_UNIVISION_SW_I2C u8x8(3, 2);
 
 void setup() {
@@ -19,34 +22,38 @@ void setup() {
   //pinMode(13, OUTPUT);
   //digitalWrite(13, LOW);
 
+  dht.begin(); //dht
+
   Serial.begin(115200);                    //inicjalizacja monitora szeregowego
-  u8x8.begin();
+
+  u8x8.begin(); //wyswietlacz
   u8x8.setFont(u8x8_font_amstrad_cpc_extended_f);
   u8x8.drawString(0,0,"Wilg:   Temp:");
   u8x8.setFont(u8x8_font_8x13B_1x2_f );
+  
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   
-  int chk = DHT22.read(DHT22PIN);         //sprawdzenie stanu sensora
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
  
-  switch (chk)
-  {
-    case DHTLIB_OK: 
+  if (!isnan(h) && !isnan(t)) {
       Serial.print("Wilgotnosc (%): ");              //wyświetlenie wartości wilgotności
-      Serial.print((float)DHT22.humidity, 2);
+      Serial.print((float)h, 2);
       Serial.print(" ");
       Serial.print("Temperatura (C): ");           //wyświetlenie temperatury
-      Serial.println((float)DHT22.temperature, 2);
+      Serial.println((float)t, 2);
       u8x8.setCursor(1, 2);
-      u8x8.print((float)DHT22.humidity, 2);
+      u8x8.print((float)h, 2);
       u8x8.setCursor(9, 2);
-      u8x8.print((float)DHT22.temperature, 2);
-      if (DHT22.humidity > 72) {
+      u8x8.print((float)t, 2);
+      
+      if (h > 72) {
         digitalWrite(10, HIGH);
         //digitalWrite(13, HIGH);
-      } else if (DHT22.humidity < 67) {
+      } else if (h < 67) {
         digitalWrite(10, LOW);
         //digitalWrite(13, LOW);
       } else {
@@ -59,18 +66,8 @@ void loop() {
         digitalWrite(13, HIGH);
         */
       }
-    break;
-    case DHTLIB_ERROR_CHECKSUM: 
-    //Serial.println("Błąd sumy kontrolnej"); 
-    break;
-    case DHTLIB_ERROR_TIMEOUT: 
-    //Serial.println("Koniec czasu oczekiwania - brak odpowiedzi"); 
-    break;
-    default: 
-    //Serial.println("Nieznany błąd"); 
-    break;
   }
   
-  delay(1000);
+  delay(2000);
 
 }
